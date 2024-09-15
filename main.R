@@ -326,9 +326,35 @@ front_to_back <- function(passengers) {
   passengers[order(passengers$row), ]
 }
 
-window_middle_aisle <- function(passengers) {
-  passengers[order(passengers$seat), ]
+back_to_front_with_shuffle <- function(passengers, k = 3) {
+  ps <- passengers[order(passengers$row, decreasing = TRUE), ]
+  permute_blocks(ps, k)
 }
+
+front_to_back_with_shuffle <- function(passengers, k = 3) {
+  ps <- passengers[order(passengers$row), ]
+  permute_blocks(ps, k)
+}
+
+permute_blocks <- function(df, k) {
+  n <- nrow(df)
+  if (n %% k != 0) {
+    stop("The number of rows in the dataframe is not divisible by the number of blocks.")
+  }
+  
+  rows_per_block <- n / k
+  blocks <- split(df, rep(1:k, each = rows_per_block))
+  permuted_blocks <- lapply(blocks, function(block) {
+    block[sample(nrow(block)), ]
+  })
+  result <- do.call(rbind, permuted_blocks)
+  result
+}
+
+
+# window_middle_aisle <- function(passengers) {
+#   passengers[order(passengers$seat), ]
+# }
 
 
 # Main simulation -------------------------------------------------------------

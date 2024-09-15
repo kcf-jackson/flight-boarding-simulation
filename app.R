@@ -13,7 +13,11 @@ ui <- fluidPage(
         table { font-size: 2.5rem; }
     ")),
     titlePanel("Flight boarding simulator"),
-    p("This app simulates flight boarding strategies. Can you figure out which boarding strategy is the most efficient?"),
+    p("This app simulates flight boarding strategies. You can adjust the flight 
+      layout, passenger settings, and choose from a few boarding strategies to 
+      see how they impact boarding time. Can you figure out which strategy leads
+      to the fastest and smoothest boarding process? And which variable has the 
+      most impact?"),
   
     sidebarLayout(
         sidebarPanel(
@@ -39,20 +43,16 @@ ui <- fluidPage(
                         min = 0,
                         max = 3,
                         value = 2),
-            # rangeInput("satisfaction",
-            #            "Satisfaction range:",
-            #            min = 1,
-            #            max = 10,
-            #            step = 0.5, 
-            #            value = c(1.5, 5)),
             selectInput("strategy", "Boarding strategy", 
                         list("Random" = "random", 
                              "Back-to-front" = "back-to-front", 
+                             "Back-to-front (with shuffle)" = "back-to-front-with-shuffle", 
                              "Front-to-back" = "front-to-back", 
-                             "Window-Middle-Aisle" = "window-middle-aisle"),
+                             "Front-to-back (with shuffle)" = "front-to-back-with-shuffle"), 
                         selected = "Random")
           ),
           
+          # Section 3: Control Panel
           wellPanel(
             h4("Control"),
             sliderInput("duration",
@@ -63,25 +63,22 @@ ui <- fluidPage(
             actionButton("start", "Start"),
             actionButton("pause", "Play / Pause"),
             actionButton("reset", "Reset")
-            # actionButton("mruns", "1000 Runs")
           ),
           width = 3
         ),
         
+        # Main Panel (time textbox, animate plot, and satisfaction table)
         mainPanel(
           fluidRow(
             column(
               div(textOutput("time"), style = "font-size: 32px;"),
               animateOutput(),
-              width = 10
+              width = 9
             ),
             column(
               tableOutput("satisfaction_table"),
-              width = 2
+              width = 3
             )
-          ),
-          fluidRow(
-            plotOutput("time_histogram")      
           ),
           width = 9
         )
@@ -106,14 +103,25 @@ server <- function(input, output, session) {
     shinyjs::disable("pause")
     
     
-    # Events
+    # Events ----
     observeEvent(input$rows, {
       num_row <- input$rows
-      row_layout <- as.numeric(trimws(strsplit(input$row_layout, ",")[[1]]))
-      strategy <- input$strategy
-      max_luggage <- input$n_luggage
-      init_layout(num_row, row_layout, p_book = 1.0, max_luggage = max_luggage,
-                  method = "animate", strategy = strategy)
+      row_layout <- tryCatch({
+        as.numeric(trimws(strsplit(input$row_layout, ",")[[1]]))
+      }, 
+      warning = function(w) { NULL }, 
+      error = function(e) { NULL }
+      )
+      
+      if (length(row_layout) == 0 || is.null(row_layout) || any(is.na(row_layout))) {
+        shinyjs::alert("Invalid row layout input. Resetting to default value.")
+        updateTextInput(session, "row_layout", value = "3, 3")
+      } else {
+        strategy <- input$strategy
+        max_luggage <- input$n_luggage
+        init_layout(num_row, row_layout, p_book = 1.0, max_luggage = max_luggage,
+                    method = "animate", strategy = strategy)
+      }
     })
 
     observeEvent(input$start, { 
@@ -122,21 +130,33 @@ server <- function(input, output, session) {
       shinyjs::enable("reset")
       
       num_row <- input$rows
-      row_layout <- as.numeric(trimws(strsplit(input$row_layout, ",")[[1]]))
-      strategy <- input$strategy
-      max_luggage <- input$n_luggage
-      duration <- input$duration      
+      row_layout <- tryCatch({
+        as.numeric(trimws(strsplit(input$row_layout, ",")[[1]]))
+      }, 
+        warning = function(w) { NULL }, 
+        error = function(e) { NULL }
+      )
       
-      # Initialize layout and store the required variables in reactiveValues
-      args <- init_layout(num_row, row_layout, p_book = 1.0, max_luggage = max_luggage,
-                          method = "animate", strategy = strategy)
-      v$passenger_list <- args$passenger_list
-      v$method <- args$method
-      v$args <- args$args
-      v$args$duration <- duration
-      v$time <- 0
-      
-      v$playing <- TRUE
+      if (length(row_layout) == 0 || is.null(row_layout) || any(is.na(row_layout))) {
+        shinyjs::alert("Invalid row layout input. Resetting to default value.")
+        updateTextInput(session, "row_layout", value = "3, 3")
+      } else {
+        strategy <- input$strategy
+        max_luggage <- input$n_luggage
+        duration <- input$duration      
+        
+        # Initialize layout and store the required variables in reactiveValues
+        args <- init_layout(num_row, row_layout, p_book = 1.0, max_luggage = max_luggage,
+                            method = "animate", strategy = strategy)
+        v$passenger_list <- args$passenger_list
+        v$method <- args$method
+        v$args <- args$args
+        v$args$duration <- duration
+        v$time <- 0
+        
+        v$playing <- TRUE
+        output$satisfaction_table <- renderTable({ NULL })
+      }
     })
     
     observeEvent(input$pause, { 
@@ -148,25 +168,10 @@ server <- function(input, output, session) {
       enable_ui()
       shinyjs::disable("pause")
       clear()
+      v$time <- 0
+      output$satisfaction_table <- renderTable({ NULL })
+      output$time <- renderText({ paste("Time:", v$time) })
     })
-    
-    # A bit slow to run
-    # observeEvent(input$mruns, {
-    #   output$time_histogram <- renderPlot({
-    #     complete_time <- sapply(1:10, function(id) {
-    #       res <- simulate(
-    #         num_row = input$rows, 
-    #         row_layout = as.numeric(trimws(strsplit(input$row_layout, ",")[[1]])), 
-    #         p_book = 1.0, 
-    #         max_luggage = input$max_luggage,
-    #         strategy = input$strategy
-    #       )
-    #       print(res)
-    #       res
-    #     })
-    #     hist(complete_time, breaks = 20, main = "Time to board 1000 planes", xlab = "Time")
-    #   })
-    # })
     
     observeEvent(input$duration, {
       v$args$duration <- input$duration
@@ -207,7 +212,9 @@ server <- function(input, output, session) {
           satisfaction[happy] <- "Happy"
           satisfaction <- data.frame(satisfaction)
           output$satisfaction_table <- renderTable({
-            table(satisfaction)
+            tbl <- data.frame(table(satisfaction))
+            colnames(tbl) <- c("Satisfaction", "Count")
+            tbl
           })
           
           v$playing <- FALSE
@@ -255,6 +262,8 @@ init_layout <- function(num_row, row_layout, p_book, max_luggage, method, strate
     "random" = random_boarding,
     "back-to-front" = back_to_front,
     "front-to-back" = front_to_back,
+    "back-to-front-with-shuffle" = back_to_front_with_shuffle,
+    "front-to-back-with-shuffle" = front_to_back_with_shuffle,
     "window-middle-aisle" = window_middle_aisle 
   )
   passenger_list <- boarding(passenger_list)
