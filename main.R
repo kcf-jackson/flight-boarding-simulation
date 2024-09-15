@@ -61,10 +61,16 @@ create_plane_layout <- function(num_row, row_layout) {
 #' @param row_layout A vector describing the layout of the seats.
 #' Some examples are c(3, 4, 3), c(3, 3), c(3, 3), c(2, 4, 2).
 #' @param p_book A numeric value between 0 and 1; the proportion of booked seats.
+#' @param max_luggage A positive integer; the maximum number of carry-on luggage.
+#' @param strategy A string; the boarding strategy. One of 'random', 'back-to-front', 
+#' 'front-to-back', 'window-middle-aisle'.
 #' @param method 'print', 'plot' or 'animate'. 
 #' For 'print', the simulation will print out the layout matrix.
 #' For 'plot', the simulation will plot the layout matrix with 'base' plot.
 #' For 'animate', the simulation will plot the layout matrix with 'animate' plot.
+#' @param duration A positive integer; the duration of each step in milliseconds.
+#' 
+#' @return A numeric value; the total time taken to board the plane.
 simulate <- function(num_row = 5, row_layout = c(2, 2), p_book = 1.0, 
                      max_luggage = 2, strategy = "random",
                      method = 'print', duration = 250) {
@@ -350,7 +356,6 @@ permute_blocks <- function(df, k) {
   result <- do.call(rbind, permuted_blocks)
   result
 }
-
 
 # window_middle_aisle <- function(passengers) {
 #   passengers[order(passengers$seat), ]
